@@ -32,13 +32,14 @@ python train.py test multi_resnet18_kd \
 
 As the original paper does not tell us the hyper-parameters, I just use the follow setting. If you find better hyper-parmeters, you could tell me in the issues. Moreover, we do not konow the side-branch architecture details. So the accuracy is lower than the original paper.
 I will fine-tune the hyper-parameters.
-# alpha = 0.1
-# temperature = 3
-# beta = 1e-6
-
-Method | Classifier 1/4 | Classifier 2/4 | Classifier 3/4 | Classifier 4/4 
--------  | ------- | ------- ｜ ------- ｜ -------
-Original | 67.85   | 74.57   ｜ 78.23   ｜ 78.64
-Ours     | 67.17   | 73.27    | 77.14   | 77.86
+ ```
+alpha = 0.1
+temperature = 3
+beta = 1e-6
+```
+|   Method   | Classifier 1/4 | Classifier 2/4 | Classifier 3/4 | Classifier 4/4 |
+|:----------:|:--------------:|:--------------:|:--------------:|:--------------:|
+| Original   |    67.85       |74.57          |       78.23   |     78.64      |
+| Ours       | 67.17          | 73.27          | 77.14          | 77.86          |
 
 
