@@ -55,7 +55,7 @@ def parse_args():
                              'iterations')
     parser.add_argument('--save-folder', default='save_checkpoints/', type=str,
                         help='folder to save the checkpoints')
-    parser.add_argument('--summary-folder', default='runs/', type=str,
+    parser.add_argument('--summary-folder', default='runs_alpha01/', type=str,
                         help='folder to save the summary')
     parser.add_argument('--eval-every', default=1000, type=int,
                         help='evaluate model every (default: 1000) iterations')
@@ -63,8 +63,10 @@ def parse_args():
     #kd parameter
     parser.add_argument('--temperature', default=3, type=int,
                         help='temperature to smooth the logits')
-    parser.add_argument('--alpha', default=0.5, type=float,
+    parser.add_argument('--alpha', default=0.1, type=float,
                         help='weight of kd loss')
+    parser.add_argument('--beta', default=1e-6, type=float,
+                        help='weight of feature loss')
 
     args = parser.parse_args()
     return args
@@ -173,6 +175,9 @@ def run_training(args):
         losses1_kd = AverageMeter()
         losses2_kd = AverageMeter()
         losses3_kd = AverageMeter()
+        feature_losses_1 = AverageMeter()
+        feature_losses_2 = AverageMeter()
+        feature_losses_3 = AverageMeter()
         total_losses = AverageMeter()
         middle1_top1 = AverageMeter()
         middle2_top1 = AverageMeter()
@@ -185,7 +190,8 @@ def run_training(args):
             target = target.squeeze().long().cuda(async=True)
             input = Variable(input).cuda()
 
-            output, middle_output1, middle_output2, middle_output3 = model(input)
+            output, middle_output1, middle_output2, middle_output3, \
+            final_fea, middle1_fea, middle2_fea, middle3_fea = model(input)
             
             loss = criterion(output, target)
             losses.update(loss.item(), input.size(0))
@@ -210,8 +216,16 @@ def run_training(args):
             loss3by4 = kd_loss_function(middle_output3, temp4.detach(), args) * (args.temperature**2)
             losses3_kd.update(loss3by4, input.size(0))
             
+            feature_loss_1 = feature_loss_function(middle1_fea, final_fea.detach()) 
+            feature_losses_1.update(feature_loss_1, input.size(0))
+            feature_loss_2 = feature_loss_function(middle2_fea, final_fea.detach()) 
+            feature_losses_2.update(feature_loss_2, input.size(0))
+            feature_loss_3 = feature_loss_function(middle3_fea, final_fea.detach()) 
+            feature_losses_3.update(feature_loss_3, input.size(0))
+
             total_loss = (1 - args.alpha) * (loss + middle1_loss + middle2_loss + middle3_loss) + \
-                        args.alpha * (loss1by4 + loss2by4 + loss3by4)
+                        args.alpha * (loss1by4 + loss2by4 + loss3by4) + \
+                        args.beta * (feature_loss_1 + feature_loss_2 + feature_loss_3)
             total_losses.update(total_loss.item(), input.size(0))
             
             prec1 = accuracy(output.data, target, topk=(1,))
@@ -244,6 +258,9 @@ def run_training(args):
                 writer.add_scalar('middle1_acc', middle1_top1.avg, step)
                 writer.add_scalar('middle2_acc', middle2_top1.avg, step)
                 writer.add_scalar('middle3_acc', middle3_top1.avg, step)
+                writer.add_scalar('feature_loss_1', feature_losses_1.avg, step)
+                writer.add_scalar('feature_loss_2', feature_losses_2.avg, step)
+                writer.add_scalar('feature_loss_3', feature_losses_3.avg, step)
                 
                 step += 1
                 logging.info("Epoch: [{0}]\t"
@@ -292,7 +309,9 @@ def validate(args, test_loader, model, criterion, writer=None, current_epoch=0):
         target = target.squeeze().long().cuda(async=True)
         input = Variable(input).cuda()
 
-        output, middle_output1, middle_output2, middle_output3 = model(input)
+        output, middle_output1, middle_output2, middle_output3, \
+        final_fea, middle1_fea, middle2_fea, middle3_fea = model(input)
+            
         loss = criterion(output, target)
         losses.update(loss.item(), input.size(0))
         middle1_loss = criterion(middle_output1, target)
@@ -350,6 +369,9 @@ def kd_loss_function(output, target_output,args):
     loss_kd = -torch.mean(torch.sum(output_log_softmax * target_output, dim=1))
     return loss_kd
 
+def feature_loss_function(fea, target_fea):
+    loss = (fea - target_fea)**2 * ((fea > 0) | (target_fea > 0)).float()
+    return torch.abs(loss).sum()
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

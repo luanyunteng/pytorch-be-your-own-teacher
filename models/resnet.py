@@ -181,27 +181,31 @@ class Multi_ResNet(nn.Module):
         x = self.layer1(x)
         middle_output1 = self.bottleneck1_1(x)
         middle_output1 = self.avgpool1(middle_output1)
+        middle1_fea = middle_output1
         middle_output1 = torch.flatten(middle_output1, 1)
         middle_output1 = self.middle_fc1(middle_output1)
 
         x = self.layer2(x)
         middle_output2 = self.bottleneck2_1(x)
         middle_output2 = self.avgpool2(middle_output2)
+        middle2_fea = middle_output2
         middle_output2 = torch.flatten(middle_output2, 1)
         middle_output2 = self.middle_fc2(middle_output2)
 
         x = self.layer3(x)
         middle_output3 = self.bottleneck3_1(x)
         middle_output3 = self.avgpool3(middle_output3)
+        middle3_fea = middle_output3
         middle_output3 = torch.flatten(middle_output3, 1)
         middle_output3 = self.middle_fc3(middle_output3)
 
         x = self.layer4(x)
         x = self.avgpool(x)
+        final_fea = x
         x = torch.flatten(x, 1)
         x = self.fc(x)
 
-        return x, middle_output1, middle_output2, middle_output3
+        return x, middle_output1, middle_output2, middle_output3, final_fea, middle1_fea, middle2_fea, middle3_fea
 
 def multi_resnet50_kd(num_classes=1000):
     return Multi_ResNet(BottleneckBlock, [3,4,6,3], num_classes=num_classes)
