@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
-from torch.autograd import Variable
 
 import os
 import shutil
@@ -21,6 +20,7 @@ def parse_args():
     # hyper-parameters are from ResNet paper
     parser = argparse.ArgumentParser(description='PyTorch CIFAR10 training')
     parser.add_argument('cmd', choices=['train', 'test'])
+    parser.add_argument('--device', type=str, default='cuda', choices=['cuda', 'cpu'])
     parser.add_argument('--data-dir', default='/home/xxx/cifar100', type=str,
                         help='the diretory to save cifar100 dataset')
     parser.add_argument('arch', metavar='ARCH', default='multi_resnet50_kd',
@@ -100,7 +100,7 @@ def run_test(args):
         model = models.__dict__[args.arch](num_classes=100)
     else:
         raise NotImplementedError
-    model = torch.nn.DataParallel(model).cuda()
+    model = torch.nn.DataParallel(model).to(args.device)
 
     # load checkpoint
     if args.resume:
@@ -124,7 +124,7 @@ def run_test(args):
                                                         num_workers=args.workers)
     else:
         raise NotImplementedError
-    criterion = nn.CrossEntropyLoss().cuda()
+    criterion = nn.CrossEntropyLoss().to(args.device)
     validate(args, test_loader, model, criterion)
 
 def run_training(args):
@@ -133,7 +133,7 @@ def run_training(args):
         model = models.__dict__[args.arch](num_classes=100)
     else:
         raise NotImplementedError
-    model = torch.nn.DataParallel(model).cuda()
+    model = torch.nn.DataParallel(model).to(args.device)
     best_prec1 = 0
 
     if args.resume:
@@ -157,7 +157,7 @@ def run_training(args):
     else:
         raise NotImplementedError
    
-    criterion = nn.CrossEntropyLoss().cuda()
+    criterion = nn.CrossEntropyLoss().to(args.device)
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay = args.weight_decay)
 
 
@@ -187,8 +187,8 @@ def run_training(args):
         for i, (input, target) in enumerate(train_loader):
             data_time.update(time.time() - end)
             
-            target = target.squeeze().long().cuda(async=True)
-            input = Variable(input).cuda()
+            target = target.squeeze().long().to(args.device)
+            input = input.to(args.device)
 
             output, middle_output1, middle_output2, middle_output3, \
             final_fea, middle1_fea, middle2_fea, middle3_fea = model(input)
@@ -306,8 +306,8 @@ def validate(args, test_loader, model, criterion, writer=None, current_epoch=0):
     end = time.time()
     for i, (input, target) in enumerate(test_loader):
 
-        target = target.squeeze().long().cuda(async=True)
-        input = Variable(input).cuda()
+        target = target.squeeze().long().to(args.device)
+        input = input.to(args.device)
 
         output, middle_output1, middle_output2, middle_output3, \
         final_fea, middle1_fea, middle2_fea, middle3_fea = model(input)
